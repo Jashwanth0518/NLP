@@ -1,0 +1,167 @@
+from flask import Flask, render_template_string, request
+import language_tool_python
+
+app = Flask(__name__)
+
+tool = language_tool_python.LanguageTool(
+    'en-US', remote_server='https://api.languagetool.org/v2'
+)
+
+HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Grammar Tool</title>
+    <style>
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        /* Container */
+        .container {
+            max-width: 900px;
+            margin: 50px auto;
+            background-color: #ffffffcc;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #1a1a1a;
+            margin-bottom: 30px;
+        }
+
+        /* Textarea */
+        textarea {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border-radius: 10px;
+            border: 2px solid #66a6ff;
+            resize: vertical;
+            transition: border 0.3s;
+        }
+        textarea:focus {
+            border: 2px solid #1a73e8;
+            outline: none;
+        }
+
+        /* Button */
+        button {
+            background: #1a73e8;
+            color: white;
+            padding: 12px 30px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: background 0.3s, transform 0.2s;
+        }
+        button:hover {
+            background: #155ab6;
+            transform: translateY(-2px);
+        }
+
+        /* Section titles */
+        h2 {
+            color: #1a1a1a;
+            margin-top: 35px;
+            border-bottom: 2px solid #66a6ff;
+            padding-bottom: 5px;
+        }
+
+        /* Corrected text area */
+        .corrected-text {
+            background-color: #f0f8ff;
+            border: 2px solid #66a6ff;
+        }
+
+        /* Suggestions */
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background-color: #e8f0fe;
+            margin-bottom: 12px;
+            padding: 12px;
+            border-left: 6px solid #1a73e8;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+        li:hover {
+            background-color: #d0e0ff;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            textarea {
+                font-size: 14px;
+            }
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Grammar Correction and Writing Optimization Tool</h1>
+        <form method="POST">
+            <textarea name="text" placeholder="Enter your text here..." rows="10"></textarea><br>
+            <button type="submit">Check Grammar</button>
+        </form>
+
+        {% if corrected_text %}
+            <h2>Corrected Text:</h2>
+            <textarea class="corrected-text" rows="10">{{ corrected_text }}</textarea>
+        {% endif %}
+
+        {% if suggestions %}
+            <h2>Suggestions:</h2>
+            <ul>
+            {% for suggestion in suggestions %}
+                <li>
+                    <b>Error Context:</b> {{ suggestion.error }}<br>
+                    <b>Suggestion:</b> {{ suggestion.message }}<br>
+                    <b>Replacement:</b> {{ suggestion.replacement | join(', ') }}
+                </li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    corrected_text = ''
+    suggestions = []
+    if request.method == 'POST':
+        user_text = request.form['text']
+        matches = tool.check(user_text)
+        corrected_text = language_tool_python.utils.correct(user_text, matches)
+        for match in matches:
+            suggestions.append({
+                'error': match.context,
+                'message': match.message,
+                'replacement': match.replacements
+            })
+    return render_template_string(HTML, corrected_text=corrected_text, suggestions=suggestions)
+
+if __name__ == '__main__':
+    app.run(debug=True)
